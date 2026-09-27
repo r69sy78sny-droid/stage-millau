@@ -123,14 +123,38 @@ function renderHero(previous, initial) {
   const delta = previous ? r.score - previous.score : lastSeenDelta(lastSeen, r.score);
   $('updated').replaceChildren(...[
     h('span', { class: `badge ${ageH < 12 ? 'live' : ''}` }, h('i', { class: 'dot' }), ageH < 12 ? 'Suivi en direct' : 'Suivi en pause'),
-    h('span', {}, `Mis à jour ${fmtWhen(r.generatedAt)}`),
+    h('span', {}, `Données modifiées ${fmtWhen(r.generatedAt)}`),
     r.triggers?.length ? h('span', {}, `après ${r.triggers.join(', ')}`) : null,
     delta ? h('span', {}, `${fmtScore(delta)} depuis ta dernière visite`) : null,
+    h('span', { id: 'lastcheck' }),
   ].filter(Boolean));
+  showLastCheck();
   store.set('lastScore', String(r.score));
   if (previous && previous.score !== r.score) toast(`Nouvelle mise à jour : ${fmtScore(previous.score)} → ${fmtScore(r.score)}`);
 }
 const lastSeenDelta = (lastSeen, score) => (store.get('lastScore') == null || Number.isNaN(lastSeen) ? 0 : score - lastSeen);
+
+// Dernière vérification du robot (même sans nouveauté) : lue dans l'API publique de GitHub Actions.
+let lastCheck = null;
+async function fetchLastCheck() {
+  try {
+    const r = await fetch('https://api.github.com/repos/r69sy78sny-droid/stage-millau/actions/workflows/aiguille.yml/runs?per_page=1&status=success', { cache: 'no-store' });
+    const run = (await r.json()).workflow_runs?.[0];
+    if (run) lastCheck = run.updated_at;
+  } catch {
+    /* API indisponible ou quota atteint : on garde la dernière valeur */
+  }
+  showLastCheck();
+}
+function showLastCheck() {
+  const el = $('lastcheck');
+  if (!el || !report) return;
+  if (!lastCheck) return (el.textContent = '');
+  const newer = Date.parse(lastCheck) > Date.parse(report.generatedAt) + 60000;
+  el.textContent = newer
+    ? `Dernière vérification ${fmtWhen(lastCheck)} (pas de modification depuis ${fmtWhen(report.generatedAt)})`
+    : `Dernière vérification ${fmtWhen(lastCheck)}`;
+}
 
 function toast(text) {
   const t = $('toast');
@@ -621,5 +645,5 @@ document.addEventListener('visibilitychange', () => {
 
 setupTheme();
 setupTabs();
-refresh(true);
-setInterval(() => refresh(), POLL_MS);
+refresh(true).then(fetchLastCheck);
+setInterval(() => refresh().then(fetchLastCheck), POLL_MS);
