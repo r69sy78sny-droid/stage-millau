@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VU-mètre stage Millau</title>
+  <meta name="description" content="Vais-je pouvoir faire mon stage de perfectionnement parapente chez Fly Millau du 12 au 15 octobre 2026 ? Aiguille de −180 (impossible) à +180 (le stage aura lieu), recalculée à chaque nouveau run des modèles météo.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23231f17'/%3E%3Cpath d='M10 44a22 22 0 0 1 44 0' fill='none' stroke='%23f4e3bd' stroke-width='4'/%3E%3Cpath d='M32 48 44 22' stroke='%23ff6a4d' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    try { const t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div class="title">
+        <strong>Vais-je voler à Millau ?</strong>
+        <span>Stage perfectionnement · Fly Millau · 3 matinées de vol entre le lundi 12 et le jeudi 15 octobre 2026</span>
+      </div>
+      <button class="theme-btn" id="theme" type="button">Thème</button>
+    </header>
+
+    <section class="hero" aria-labelledby="score">
+      <div class="meter-box" id="gauge"></div>
+      <div class="readout">
+        <div class="score" id="score">…</div>
+        <div class="verdict" id="verdict">Chargement des prévisions</div>
+        <div class="proba" id="proba"></div>
+        <div class="clim" id="clim"></div>
+        <p class="summary" id="summary"></p>
+        <div class="updated" id="updated"></div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="h-days">
+      <header>
+        <h2 id="h-days">Les 4 matinées</h2>
+        <p>Probabilité d'avoir au moins 2 h volables d'affilée entre 9 h et 13 h. Le petit trait vertical marque la normale climatologique.</p>
+      </header>
+      <div class="days" id="days"></div>
+    </section>
+
+    <section class="section">
+      <div class="grid-2">
+        <div class="card chart">
+          <figure>
+            <figcaption id="dist-cap"><b>Combien de matinées volables ?</b></figcaption>
+            <div id="dist"></div>
+            <div class="legend">
+              <span><i style="background:var(--accent)"></i>3 ou 4 : tes séances volent</span>
+              <span><i style="background:var(--seq-200)"></i>moins de 3</span>
+              <span><i class="line" style="background:var(--ink)"></i>climatologie 1993-2025</span>
+            </div>
+            <details class="table-view"><summary>Voir en tableau</summary><div id="dist-table"></div></details>
+          </figure>
+        </div>
+        <div class="card chart">
+          <figure>
+            <figcaption id="hist-cap"><b>La trajectoire de l'aiguille</b> · un point par mise à jour</figcaption>
+            <div id="history"></div>
+            <details class="table-view"><summary>Voir toutes les mises à jour</summary><div class="scroll-x" id="history-table"></div></details>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-label="Détails">
+      <nav class="tabs" role="tablist" id="tabs">
+        <button role="tab" id="t-jour" aria-controls="p-jour" aria-selected="true" type="button">Jour par jour</button>
+        <button role="tab" id="t-analyse" aria-controls="p-analyse" aria-selected="false" type="button">Analyse</button>
+        <button role="tab" id="t-modeles" aria-controls="p-modeles" aria-selected="false" type="button">Ensembles &amp; modèles</button>
+        <button role="tab" id="t-clim" aria-controls="p-clim" aria-selected="false" type="button">Climatologie</button>
+        <button role="tab" id="t-methode" aria-controls="p-methode" aria-selected="false" type="button">Méthode &amp; sources</button>
+      </nav>
+      <div role="tabpanel" id="p-jour" aria-labelledby="t-jour"></div>
+      <div role="tabpanel" id="p-analyse" aria-labelledby="t-analyse" hidden></div>
+      <div role="tabpanel" id="p-modeles" aria-labelledby="t-modeles" hidden></div>
+      <div role="tabpanel" id="p-clim" aria-labelledby="t-clim" hidden></div>
+      <div role="tabpanel" id="p-methode" aria-labelledby="t-methode" hidden></div>
+    </section>
+
+    <footer>
+      <p>Données météo : <a href="https://open-meteo.com/">Open-Meteo.com</a> (CC BY 4.0), modèles ECMWF, NOAA, DWD, ECCC, Met Office, Météo-France, MeteoSwiss, Google DeepMind, JMA ; observations Météo-France (Licence Ouverte 2.0) ; réanalyse ERA5 (Copernicus). Outil d'aide personnel : c'est toujours le moniteur de Fly Millau qui décide si l'on vole.</p>
+    </footer>
+  </div>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

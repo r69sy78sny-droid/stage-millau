@@ -1,0 +1,1 @@
+{"name":"stage-millau","private":true,"type":"module","scripts":{"test":"node --test tests/*.test.mjs","update":"node scripts/update.mjs","climatology":"node scripts/build-climatology.mjs"}}
