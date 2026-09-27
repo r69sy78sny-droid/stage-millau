@@ -165,8 +165,10 @@ export function classifyRegime(a) {
   const ws = a.windDay ?? 0;
   const rr = a.precipDay ?? 0;
   const se = dir != null && inSector(dir, 100, 200);
+  // Flux méditerranéen : sud à est, y compris le « retour d'est » qui ramène l'humidité vers l'ouest.
+  const med = dir != null && inSector(dir, 60, 200);
   const convective = (a.capeMax ?? 0) >= 300 || (a.showersShare ?? 0) >= 0.6;
-  if (se && (rr >= 10 || (a.aigoual ?? 0) >= 40)) return 'cevenol';
+  if (med && (rr >= 10 || (a.aigoual ?? 0) >= 40)) return 'cevenol';
   if (rr >= 5) return convective ? 'instable' : 'perturbe';
   if (ws >= 15 && dir != null) {
     if (se) return 'sud';

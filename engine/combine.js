@@ -74,7 +74,7 @@ export function systemWeight(sys, d, all) {
  * now : horodatage (ms). Renvoie les probabilités par jour, la loi du nombre de matinées volables,
  * la probabilité que les séances volent, l'aiguille et les scénarios les plus probables.
  */
-export function combine(systems, clim, { now = Date.now(), sessions = STAGE.sessionsNeeded, samples = 40000, observed = {} } = {}) {
+export function combine(systems, clim, { now = Date.now(), sessions = STAGE.sessionsNeeded, samples = 120000, observed = {} } = {}) {
   const nd = STAGE.dates.length;
   const W = systems.map((s) => STAGE.dates.map((_, d) => systemWeight(s, d, systems)));
   const days = STAGE.dates.map((date, d) => {

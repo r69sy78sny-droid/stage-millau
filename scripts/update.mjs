@@ -98,7 +98,7 @@ if (!REBUILD) {
       writeJson(file, summary);
       state.systems[sys.id] = { init: runInit, engine: ENGINE_VERSION, fetchedAt: summary.fetchedAt };
       refreshed.push(sys.id);
-      if (summary.cover.some(Boolean)) triggers.push(`${sys.short} ${runLabel(runInit)}`);
+      if (newRun && summary.cover.some(Boolean)) triggers.push(`${sys.short} ${runLabel(runInit)}`);
       log(`✓ ${sys.label} run ${runLabel(runInit)} — ${parsed.members.length} membres, matinées couvertes ${summary.cover.map((c) => (c ? '■' : '□')).join('')}, p = ${summary.days.map((d) => (d.p == null ? '—' : Math.round(d.p * 100))).join(' / ')}`);
     } catch (e) {
       errors.push(`${sys.label} : ${e.message}`);

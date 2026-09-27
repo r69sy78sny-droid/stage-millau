@@ -291,7 +291,7 @@ function detTable(d) {
   const rows = d.det.filter((m) => m.cover || m.tMax != null);
   if (!rows.length) return h('p', { class: 'muted' }, 'Aucun modèle déterministe n’atteint encore cette journée (AROME : 42 h, ARPEGE : 4 j, ICON : 7,5 j, ECMWF et GFS : 15-16 j).');
   return h('div', { class: 'scroll-x' }, table(
-    ['Modèle', 'Run', 'Matinée', 'T mini / maxi', 'Vent matin', 'Rafales', 'Pluie matin / jour', 'Nuages bas', 'Base', 'Pression', 'Z500', 'T850', 'Vent 850', 'Gradient 9 h', 'Cause'],
+    ['Modèle', 'Run', 'Matinée', 'T mini / maxi', 'Vent matin', 'Rafales', 'Pluie matin / jour', 'Nuages bas', 'Base', 'Sommet couche humide', 'Couche limite 14 h', 'Pression', 'Z500', 'T850', 'Vent 850', 'Gradient 9 h', 'Brouillard vallée', 'Cause'],
     rows.map((m) => [
       `${m.label} (${m.res})`,
       m.run ? fmtWhen(m.run, { weekday: undefined, hour: '2-digit' }) : '—',
@@ -301,15 +301,18 @@ function detTable(d) {
       m.morning?.wg == null ? '—' : `${fr(m.morning.wg)} km/h`,
       `${fr(m.rrMorning, 1)} / ${fr(m.rrDay, 1)} mm`,
       m.cclMorning == null ? '—' : `${fr(m.cclMorning)} %`,
-      m.base10 == null ? '—' : `${fr(m.base10)} m`,
+      m.base10 == null ? '—' : `${fr(m.base10)} m`,
+      m.moistTop == null ? '—' : `${fr(m.moistTop)} m`,
+      m.blh14 == null ? '—' : `${fr(m.blh14)} m sol`,
       m.mslp == null ? '—' : `${fr(m.mslp)} hPa`,
       m.z500 == null ? '—' : `${fr(m.z500)} m`,
       m.t850 == null ? '—' : `${fr(m.t850, 1)} °C`,
       m.ws850 == null ? '—' : `${fr(m.ws850)} km/h ${sector(m.wd850)}`,
       m.lapse9 == null ? '—' : `${fr(m.lapse9, 2)} °C/100 m${m.lapse9 > 0 ? ' (inversion)' : ''}`,
+      m.valleyFogHours == null ? '—' : `${m.valleyFogHours} h`,
       m.lim ? LIM_LABEL[m.lim] : m.P == null ? '—' : 'volable',
     ]),
-    [false, false, true, true, true, true, true, true, true, true, true, true, true, true, false],
+    [false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false],
   ));
 }
 

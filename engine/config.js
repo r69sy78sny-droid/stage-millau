@@ -2,7 +2,7 @@
 // et les systèmes de prévision interrogés. Tout choix « métier » est ici, pas dans le code.
 
 /** Change ce numéro quand le traitement des données change : les résumés par système sont alors recalculés. */
-export const ENGINE_VERSION = 4;
+export const ENGINE_VERSION = 5;
 
 export const STAGE = {
   title: 'Stage perfectionnement parapente · Fly Millau',
@@ -183,7 +183,7 @@ export const API = {
 
 /** Régimes météo (classement de chaque membre, chaque jour). */
 export const REGIMES = {
-  cevenol: { label: 'Épisode méditerranéen / cévenol', color: '#7b3fa0', fly: 'non volable : pluie, plafond bas, vent de sud-est' },
+  cevenol: { label: 'Épisode méditerranéen / cévenol (ou retour d’est)', color: '#7b3fa0', fly: 'non volable : pluie, plafond bas, vent de sud-est' },
   perturbe: { label: 'Passage perturbé (pluie)', color: '#3f6fb5', fly: 'rarement volable' },
   instable: { label: 'Instable, averses', color: '#4f9fb0', fly: 'créneaux possibles entre les averses' },
   sud: { label: 'Flux de sud-est (vent du Midi, marin)', color: '#d0873a', fly: 'Novis / Pic d’Andan si le vent reste modéré' },
