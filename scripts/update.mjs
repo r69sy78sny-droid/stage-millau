@@ -254,7 +254,7 @@ state.updates = (state.updates ?? 0) + 1;
 state.lastUpdate = report.generatedAt;
 writeJson('data/state.json', state);
 
-const summary = `🎯 ${last ? `${fmtScore(last.score)} → ` : ''}${fmtScore(report.score)} (${Math.round(report.p * 100)} %) · ${triggers.join(', ') || (REBUILD ? 'recalcul' : 'mise à jour')}`;
+const summary = `🎯 ${last ? `${fmtScore(last.score)} → ` : ''}${fmtScore(report.score)} (${Math.round(report.p * 100)} %) · ${triggers.join(', ') || process.env.TRIGGER_LABEL || 'recalcul'}`;
 log(summary);
 log('Matinées :', report.days.map((d) => `${d.label} ${Math.round(d.p * 100)} % (a=${d.a})`).join(' | '));
 if (errors.length) log('Avertissements :', errors);

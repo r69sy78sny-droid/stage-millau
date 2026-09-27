@@ -181,7 +181,7 @@ test('trajectoires : deux familles bien séparées sont retrouvées', () => {
 test('le rapport complet se construit et reste borné', () => {
   const climFull = {
     mornings: { pMorning: 0.6, windows: clim.windows, pAtLeast: [0.9, 0.75, 0.47, 0.2], dist4: [0.1, 0.15, 0.28, 0.27, 0.2], period: '1993-2025', window: '8-19 oct.', limiting: {}, pFlyAfterFly: 0.7, pFlyAfterNoFly: 0.43 },
-    strip: [], windRose: { calm: 0.4, sectors: [] },
+    station: { alt: 712 }, strip: [], windRose: { calm: 0.4, sectors: [] },
     normals: { window: { tx: { mean: 16 }, tn: { mean: 9 } } },
     occurrences: { fog: 0.17, window: '8-19 oct.', period: '1991-2025' },
     valley: { dTx: 2.6, dTn: 0.8 }, era5: { mslp: { mean: 1017.6, sd: 6.2 }, period: '1993-2025' },
@@ -193,4 +193,5 @@ test('le rapport complet se construit et reste borné', () => {
   assert.equal(r.days.length, 4);
   assert.ok(r.analysis.summary.length >= 2);
   assert.ok(r.days[0].stats.tMax.length === 3);
+  assert.equal(r.days[0].anom.normTx, 15.2); // normale de la station (16 °C à 712 m) ramenée à 828 m
 });

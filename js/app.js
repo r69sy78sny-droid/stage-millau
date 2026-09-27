@@ -336,8 +336,8 @@ function renderDayDetail() {
     h('div', { class: 'grid-3', style: 'margin-top:12px' },
       statCard('Températures', [
         ['Déco mini / maxi', s.tMin ? `${qr(s.tMin, 1, ' °C')} / ${qr(s.tMax, 1, ' °C')}` : '—'],
-        ['Normales (station)', `${fr(n.tn.mean, 1)} / ${fr(n.tx.mean, 1)} °C`],
-        ['Écart à la normale', d.anom.tMax == null ? '—' : `${d.anom.tMax > 0 ? '+' : ''}${fr(d.anom.tMax, 1)} °C (maxi)`],
+        ['Normales à 828 m', `${fr(d.anom.normTn, 1)} / ${fr(d.anom.normTx, 1)} °C`],
+        ['Écart à la normale', d.anom.tMax == null ? '—' : `${d.anom.tMin > 0 ? '+' : ''}${fr(d.anom.tMin, 1)} / ${d.anom.tMax > 0 ? '+' : ''}${fr(d.anom.tMax, 1)} °C`],
         ['Vallée (Millau-Plage)', d.valley.tMin == null ? '—' : `${fr(d.valley.tMin, 1)} / ${fr(d.valley.tMax, 1)} °C`],
         ['Gradient vallée → déco', d.valley.gradient15 == null ? '—' : `${fr(d.valley.gradient15, 2)} °C/100 m l'après-midi`],
         ['Ressenti 10 h / 15 h', `${q(s.at10, 1, ' °C')} / ${q(s.at15, 1, ' °C')}`],

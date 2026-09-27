@@ -102,9 +102,13 @@ export function buildReport({ ens, det, clim, now = Date.now(), metas = {}, refr
       morning: period('morning'), afternoon: period('afternoon'), evening: period('evening'),
     };
     const n = clim.normals.window;
+    // Normales de la station (712 m) ramenées à l'altitude du déco avec le gradient standard.
+    const dT = -0.0065 * (POINTS.deco.elevation - clim.station.alt);
     const anom = {
-      tMax: stats.tMax ? round(stats.tMax[1] - n.tx.mean, 1) : null,
-      tMin: stats.tMin ? round(stats.tMin[1] - n.tn.mean, 1) : null,
+      normTx: round(n.tx.mean + dT, 1),
+      normTn: round(n.tn.mean + dT, 1),
+      tMax: stats.tMax ? round(stats.tMax[1] - (n.tx.mean + dT), 1) : null,
+      tMin: stats.tMin ? round(stats.tMin[1] - (n.tn.mean + dT), 1) : null,
       mslp: stats.mslp ? round(stats.mslp[1] - clim.era5.mslp.mean, 1) : null,
       z500: stats.z500 ? round(stats.z500[1] - clim.upper.z500.mean, 0) : null,
       t850: stats.t850 ? round(stats.t850[1] - clim.upper.t850.mean, 1) : null,
@@ -300,8 +304,8 @@ export function writeAnalysis(r) {
     const s = d.stats;
     if (!s.tMax) continue;
     out.temps.push(
-      `${cap(d.label)} : déco (828 m) mini ${fr(s.tMin[1], 1)} °C / maxi ${fr(s.tMax[1], 1)} °C (normales station 712 m : ${fr(n.tn.mean, 1)} / ${fr(n.tx.mean, 1)} °C ; ` +
-      `anomalie ${signed(d.anom.tMax, 1)} °C). Fond de vallée estimé ${fr(d.valley.tMin, 1)} / ${fr(d.valley.tMax, 1)} °C (${d.valley.source}). ` +
+      `${cap(d.label)} : déco (828 m) mini ${fr(s.tMin[1], 1)} °C / maxi ${fr(s.tMax[1], 1)} °C (normales de la station ramenées à 828 m : ${fr(d.anom.normTn, 1)} / ${fr(d.anom.normTx, 1)} °C ; ` +
+      `anomalie ${signed(d.anom.tMin, 1)} / ${signed(d.anom.tMax, 1)} °C). Fond de vallée estimé ${fr(d.valley.tMin, 1)} / ${fr(d.valley.tMax, 1)} °C (${d.valley.source}). ` +
       `Ressenti à 10 h ${fr(s.at10?.[1], 1)} °C, sous voile à 35 km/h ${fr(s.chill10?.[1], 1)} °C.`,
     );
   }
