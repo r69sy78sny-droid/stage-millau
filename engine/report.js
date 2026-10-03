@@ -1,7 +1,8 @@
 // Assemble data/latest.json : l'aiguille, les probabilités par matinée, les statistiques combinées
 // de tous les systèmes, les écarts entre centres, les scénarios et l'analyse rédigée.
 
-import { STAGE, SITES, LIMITS, ENSEMBLES, DETERMINISTIC, REGIMES, POINTS, ALERT } from './config.js';
+import { STAGE, SITES, LIMITS, ENSEMBLES, DETERMINISTIC, EXPERTS, REGIMES, POINTS, ALERT } from './config.js';
+import { summarizeParaglidable, firstAvailable } from './paraglidable.js';
 import { combine, blendRegimes, clusters, blendQuantiles, blendValue, systemWeight } from './combine.js';
 import { round, vectorMean, sector8 } from './flyability.js';
 
@@ -19,7 +20,7 @@ export function verdict(score) {
   return { key: 'non', label: 'Très compromis' };
 }
 
-const CFG = Object.fromEntries([...ENSEMBLES, ...DETERMINISTIC].map((s) => [s.id, s]));
+const CFG = Object.fromEntries([...ENSEMBLES, ...DETERMINISTIC, ...EXPERTS].map((s) => [s.id, s]));
 const pct = (x) => (x == null ? '—' : `${Math.round(x * 100)} %`);
 const fr = (x, d = 0) => (x == null ? '—' : x.toFixed(d).replace('.', ','));
 const signed = (x, d = 0) => (x == null ? '—' : `${x > 0 ? '+' : x < 0 ? '−' : ''}${fr(Math.abs(x), d)}`);
@@ -39,8 +40,17 @@ function nextUpdate(meta) {
   return new Date(Date.parse(meta.available) + meta.interval * 1000).toISOString();
 }
 
-export function buildReport({ ens, det, clim, now = Date.now(), metas = {}, refreshed = [], observed = {} }) {
-  const systems = [...ens, ...det];
+/** Moyenne pondérée des systèmes météo seuls (sans les avis IA), pour comparer les deux approches. */
+function meteoOnly(contrib) {
+  const list = contrib.filter((c) => CFG[c.id] && !EXPERTS.some((e) => e.id === c.id));
+  const w = list.reduce((a, c) => a + c.w, 0);
+  return w ? round(list.reduce((a, c) => a + c.w * c.p, 0) / w, 4) : null;
+}
+
+export function buildReport({ ens, det, clim, now = Date.now(), metas = {}, refreshed = [], observed = {}, paraglidable = null }) {
+  const pgSys = summarizeParaglidable(paraglidable, clim.mornings.pMorning);
+  const ia = pgSys ? [pgSys] : [];
+  const systems = [...ens, ...det, ...ia];
   const comb = combine(systems, { pMorning: clim.mornings.pMorning, windows: clim.mornings.windows }, { now, observed });
   const regimes = blendRegimes(systems);
   const scen = clusters(systems);
@@ -67,7 +77,7 @@ export function buildReport({ ens, det, clim, now = Date.now(), metas = {}, refr
     let limW = 0;
     for (const s of systems) {
       const w = systemWeight(s, d, systems);
-      if (!w) continue;
+      if (!w || s.kind === 'ia') continue;
       const lim = s.kind === 'det' ? (s.days[d].lim ? { [s.days[d].lim]: 1 } : {}) : s.days[d].lim ?? {};
       limW += w;
       for (const [k, v] of Object.entries(lim)) limiting[k] = (limiting[k] ?? 0) + w * v;
@@ -147,10 +157,18 @@ export function buildReport({ ens, det, clim, now = Date.now(), metas = {}, refr
       det: detRows,
       confidence,
       cevenol: { pRegime: regimes[d].find((r) => r.id === 'cevenol')?.p ?? 0, pAig50: stats.pAig50, pSE20: stats.pSE20 },
+      paraglidable: {
+        pMeteo: meteoOnly(cd.contrib),
+        fly: pgSys?.days[d].fly ?? null,
+        XC: pgSys?.days[d].XC ?? null,
+        p: pgSys?.days[d].p ?? null,
+        from: firstAvailable(date),
+        history: (paraglidable?.history ?? []).filter((e) => e.v?.[date] != null).map((e) => [e.t, e.v[date]]),
+      },
     };
   });
 
-  const sysList = [...ens, ...det].map((s) => {
+  const sysList = systems.map((s) => {
     const cfg = CFG[s.id];
     const meta = (Array.isArray(cfg.meta) ? cfg.meta : [cfg.meta]).map((m) => metas[m]).filter(Boolean)
       .sort((a, b) => Date.parse(b.init) - Date.parse(a.init))[0];
@@ -176,6 +194,9 @@ export function buildReport({ ens, det, clim, now = Date.now(), metas = {}, refr
     days,
     systems: sysList,
     scenarios: scen,
+    paraglidable: paraglidable
+      ? { fetchedAt: paraglidable.fetchedAt, changedAt: paraglidable.changedAt, spot: paraglidable.spot, series: paraglidable.days, active: !!pgSys }
+      : null,
     climatology: {
       pMorning: clim.mornings.pMorning,
       pAtLeast: clim.mornings.pAtLeast,
@@ -210,7 +231,7 @@ function topRegimes(day, k = 3) {
 }
 
 export function writeAnalysis(r) {
-  const out = { summary: [], synoptic: [], wind: [], rain: [], clouds: [], temps: [], spread: [], next: [] };
+  const out = { summary: [], synoptic: [], wind: [], rain: [], clouds: [], temps: [], spread: [], ia: [], next: [] };
   const c = r.climatology;
   const aMean = r.days.reduce((s, d) => s + d.a, 0) / r.days.length;
   const leadMin = Math.min(...r.days.map((d) => d.lead ?? 99));
@@ -327,6 +348,29 @@ export function writeAnalysis(r) {
     );
   });
 
+  // Deuxième avis : Paraglidable (réseau de neurones entraîné sur les vols déclarés)
+  if (r.paraglidable) {
+    for (const d of r.days) {
+      const g = d.paraglidable;
+      if (g.fly == null) {
+        if (!d.past) out.ia.push(`${cap(d.label)} : pas encore publié par Paraglidable (il prévoit 10 jours, donc à partir du ${frDay(g.from)}).`);
+        continue;
+      }
+      let txt = `${cap(d.label)} : Paraglidable donne ${pct(g.fly)} de chances que des pilotes volent à Millau dans la journée` +
+        `${g.XC != null ? ` (potentiel de cross ${pct(g.XC)})` : ''}, soit ${pct(g.p)} une fois ramené à une matinée d'élève.`;
+      if (g.pMeteo != null) {
+        const gap = g.p - g.pMeteo;
+        txt += ` Les modèles météo seuls donnent ${pct(g.pMeteo)} : ` +
+          (Math.abs(gap) < 0.1 ? 'les deux approches concordent.' : gap > 0 ? `Paraglidable est plus optimiste (${signed(gap * 100)} points).` : `Paraglidable est plus pessimiste (${signed(gap * 100)} points).`);
+      }
+      if (g.history.length > 1) {
+        const first = g.history[0];
+        txt += ` Son avis est passé de ${pct(first[1])} (${frDate(first[0])}) à ${pct(g.fly)} en ${g.history.length - 1} révision(s).`;
+      }
+      out.ia.push(txt);
+    }
+  }
+
   // Ce qui peut faire bouger l'aiguille
   const future = r.systems
     .filter((s) => s.entry && !s.cover.every(Boolean) && Date.parse(s.entry.first) > Date.parse(r.generatedAt))
@@ -339,6 +383,7 @@ export function writeAnalysis(r) {
 }
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const frDay = (date) => new Date(`${date}T12:00:00Z`).toLocaleDateString('fr-FR', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' });
 const frDate = (iso) => {
   const d = new Date(iso);
   return d.toLocaleString('fr-FR', { timeZone: 'Europe/Paris', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });

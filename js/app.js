@@ -3,7 +3,7 @@
 
 import { createGauge } from './gauge.js';
 import { h, heat, fmtPct, fmtScore, historyChart, distChart, regimeBars, windRose, reliabilityChart } from './charts.js';
-import { REGIMES, LIMITS, SITES, ENSEMBLES, DETERMINISTIC, LEAD } from '../engine/config.js';
+import { REGIMES, LIMITS, SITES, ENSEMBLES, DETERMINISTIC, EXPERTS, LEAD } from '../engine/config.js';
 
 const POLL_MS = 5 * 60 * 1000;
 const store = {
@@ -50,6 +50,8 @@ const fmtWhen = (iso, opts = {}) => (iso ? new Date(iso).toLocaleString('fr-FR',
 const shortDay = (label) => label.replace(' octobre', '');
 const q = (arr, d = 0, unit = '') => (arr ? `${fr(arr[1], d)}${unit}` : '—');
 const qr = (arr, d = 0, unit = '') => (arr ? `${fr(arr[1], d)}${unit} (${fr(arr[0], d)} à ${fr(arr[2], d)})` : '—');
+const fmtDay = (date, opts = { weekday: 'short', day: 'numeric', month: 'short' }) => new Date(`${date}T12:00:00Z`).toLocaleDateString('fr-FR', { timeZone: 'UTC', ...opts });
+const PG = EXPERTS.find((e) => e.id === 'paraglidable');
 const SECT = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
 const sector = (deg) => (deg == null ? '—' : SECT[Math.floor(((deg + 22.5) % 360) / 45)]);
 
@@ -202,7 +204,9 @@ function renderDays() {
         h('dt', {}, 'Vent matin'), h('dd', {}, s.morning?.ws ? `${fr(s.morning.ws[1])} km/h, raf. ${fr(s.morning.wg[1])}` : '—'),
         h('dt', {}, 'Pluie matin'), h('dd', {}, fmtPct(s.pRainMorning)),
         h('dt', {}, 'Déco'), h('dd', {}, s.tMin ? `${fr(s.tMin[1])} → ${fr(s.tMax[1])} °C` : '—'),
-        h('dt', {}, 'Risque n°1'), h('dd', {}, risk ? `${risk.label} ${fmtPct(risk.p)}` : '—')),
+        h('dt', {}, 'Risque n°1'), h('dd', {}, risk ? `${risk.label} ${fmtPct(risk.p)}` : '—'),
+        ...(report.paraglidable ? [h('dt', { title: 'Réseau de neurones entraîné sur les vols réels : chance que des pilotes volent à Millau ce jour-là' }, 'IA Paraglidable'),
+          h('dd', {}, d.paraglidable.fly != null ? `${fmtPct(d.paraglidable.fly)} (journée)` : `dès le ${fmtDay(d.paraglidable.from, { day: 'numeric', month: 'short' })}`)] : [])),
       fams.length ? h('div', { class: 'chips' }, fams.map((f) => h('span', { class: 'chip' }, h('i', { style: `background:var(${FAMILIES[f.id].color})` }), `${FAMILIES[f.id].short} ${fmtPct(f.p)}`))) : null,
       h('div', { class: 'conf' }, `${CONF_LABEL[d.confidence]} · modèles ${fmtPct(d.a)} / normale ${fmtPct(1 - d.a)}`),
     );
@@ -432,6 +436,7 @@ function renderAnalysis() {
     ...sec('Nuages, plafonds et brouillard', a.clouds),
     ...sec('Températures et gradient vallée-plateau', a.temps),
     ...sec('Dispersion et écarts entre centres', a.spread),
+    ...sec('Deuxième avis : l’IA Paraglidable', a.ia),
     ...sec('Ce qui fera bouger l’aiguille', a.next),
     h('h3', {}, 'Aérologie locale : Causses et vallée du Tarn'),
     ...STATIC_AEROLOGY.map(([t, p]) => h('p', {}, h('b', {}, `${t}. `), p)),
@@ -491,6 +496,7 @@ function renderModels() {
     sysTable(ens),
     h('h3', { style: 'margin:18px 0 8px' }, 'Modèles déterministes'),
     sysTable(det),
+    ...paraglidableBlock(),
     h('div', { class: 'card chart', style: 'margin-top:18px' },
       h('figure', {},
         h('figcaption', {}, h('b', {}, 'Régimes météo par journée'), ' — part pondérée des trajectoires de tous les systèmes.'),
@@ -504,6 +510,43 @@ function renderModels() {
     table(['Matinées', 'Volables', 'Probabilité'], patterns, [false, true, true]),
   );
   regimeBars(regBox, regimeRows, FAMILIES);
+}
+
+/** Deuxième avis : Paraglidable, réseau de neurones entraîné sur les vols déclarés par les pilotes. */
+function paraglidableBlock() {
+  const r = report;
+  const pg = r.paraglidable;
+  const title = h('h3', { style: 'margin:18px 0 6px' }, 'Deuxième avis : Paraglidable (IA de volabilité)');
+  const intro = h('p', { class: 'small muted' },
+    'Paraglidable ne prévoit pas la météo : un réseau de neurones lit le modèle GFS et donne directement la probabilité que des pilotes volent ce jour-là, appris sur des centaines de milliers de vols réellement déclarés. ',
+    'Sa cible est plus large que la nôtre (journée entière, pilotes de tous niveaux, maille de 25 km) et il repose sur un seul run de GFS : son avis est rapproché de la normale ',
+    `(facteur ${fr(PG.shrink, 1)} en logit) puis pèse ${fr(PG.weight, 1)} dans le mélange, autant qu'un bon modèle déterministe.`);
+  if (!pg) return [title, intro, h('p', { class: 'muted' }, 'Pas encore de réponse de Paraglidable.')];
+  const dates = Object.keys(pg.series ?? {}).sort();
+  const strip = h('div', { class: 'pg-strip' }, dates.map((date) => {
+    const v = pg.series[date];
+    const c = heat(v.fly);
+    const inStage = r.stage.dates.includes(date);
+    return h('div', { class: inStage ? 'stage' : null, style: `background:${c.bg};color:${c.fg}`, title: `${fmtDay(date, { weekday: 'long', day: 'numeric', month: 'long' })} · vol ${fmtPct(v.fly)} · cross ${fmtPct(v.XC)}` },
+      h('b', {}, fmtDay(date, { weekday: 'short' }).replace('.', '')), h('br'), fmtDay(date, { day: 'numeric' }), h('br'), fmtPct(v.fly));
+  }));
+  const rows = r.days.map((d) => {
+    const g = d.paraglidable;
+    return [shortDay(d.label), g.fly == null ? `dès le ${fmtDay(g.from, { day: 'numeric', month: 'short' })}` : fmtPct(g.fly), fmtPct(g.XC), fmtPct(g.p), fmtPct(g.pMeteo), fmtPct(d.p)];
+  });
+  const hist = r.days.flatMap((d) => d.paraglidable.history.map(([t, v]) => ({ t, v, day: shortDay(d.label) })))
+    .sort((a, b) => Date.parse(b.t) - Date.parse(a.t));
+  return [
+    title,
+    intro,
+    h('div', { class: 'card', style: 'padding:12px' },
+      h('div', { class: 'small muted', style: 'margin-bottom:6px' }, `Millau, ${dates.length} prochains jours · encadrés : jours du stage · avis modifié ${fmtWhen(pg.changedAt)}, vérifié ${fmtWhen(pg.fetchedAt)}`),
+      h('div', { class: 'scroll-x' }, strip)),
+    h('div', { class: 'scroll-x', style: 'margin-top:10px' },
+      table(['Matinée', 'IA, journée', 'Cross', 'IA → matinée élève', 'Modèles météo', 'Mélange final'], rows, [false, true, true, true, true, true])),
+    hist.length ? h('details', { class: 'table-view' }, h('summary', {}, `Évolution de son avis (${hist.length})`),
+      table(['Publié', 'Journée', 'Vol'], hist.map((e) => [fmtWhen(e.t), e.day, fmtPct(e.v)]), [false, false, true])) : null,
+  ];
 }
 
 // ---------------------------------------------------------------- climatologie
@@ -562,7 +605,7 @@ function renderMethod() {
   const c = report.climatology;
   const cal = c.calibration;
   const relBox = h('div');
-  const weights = [...ENSEMBLES, ...DETERMINISTIC].map((s) => [s.label, s.provider, s.res, s.horizon, fr(s.weight, 1) + (s.weightWhenCovered ? ` (${fr(s.weightWhenCovered, 1)} quand l'ENS couvre)` : '')]);
+  const weights = [...ENSEMBLES, ...DETERMINISTIC, ...EXPERTS].map((s) => [s.label, s.provider, s.res, s.horizon, fr(s.weight, 1) + (s.weightWhenCovered ? ` (${fr(s.weightWhenCovered, 1)} quand l'ENS couvre)` : '')]);
   const aRows = [1, 3, 5, 7, 9, 10, 11, 13, 15, 17].map((L) => [`${L} j`, fmtPct(1 / (1 + Math.exp((L - LEAD.l50) / LEAD.scale)))]);
   const link = (href, text) => h('a', { href, rel: 'noopener' }, text);
   {
@@ -581,6 +624,8 @@ function renderMethod() {
       h('h3', {}, '5. Pondération des systèmes'),
       h('div', { class: 'scroll-x' }, table(['Système', 'Centre', 'Résolution', 'Portée', 'Poids'], weights, [false, false, false, false, true])),
       h('p', { class: 'small muted' }, 'Poids réduit de 15 % sans rafales fournies et de 10 % sans humidité. Un système ne pèse que les jours où il couvre toute la matinée.'),
+      h('h3', {}, '5 bis. Un avis d’une autre nature : Paraglidable'),
+      h('p', {}, `Tous les systèmes ci-dessus donnent de la météo que ce site traduit en matinée volable avec ses propres seuils. Paraglidable fait l'inverse : son réseau de neurones a appris, sur les vols déclarés par les pilotes, quelles situations GFS font voler. Ses erreurs ne sont donc pas les mêmes que les nôtres, ce qui en fait un bon contrôle. Comme sa cible est plus large (journée entière, tous niveaux, maille de 25 km) et qu'il ne voit qu'un run de GFS, sa probabilité p est rapprochée de la normale c : logit(p') = logit(c) + ${fr(PG.shrink, 1)} × (logit(p) − logit(c)), avant d'entrer dans le mélange avec un poids de ${fr(PG.weight, 1)}. Il n'existe pas d'archive de ses prévisions pour Millau : ce réglage est une hypothèse prudente, pas une calibration.`),
       h('h3', {}, '6. Des matinées au stage'),
       h('p', {}, `${report.samples.toLocaleString('fr-FR')} trajectoires de 4 matinées sont tirées : un système (au prorata de son poids), un de ses membres, et une fenêtre de 4 matinées réellement observées à Millau. Un seul tirage décide, jour par jour, si l'on suit le modèle ou la climatologie, ce qui conserve la persistance du temps. L'aiguille vaut 360 × P − 180, où P est la part des trajectoires qui donnent au moins ${report.stage.sessionsNeeded} matinées volables.`),
       h('h3', {}, '7. Mises à jour et alertes'),
@@ -588,6 +633,7 @@ function renderMethod() {
       h('h3', {}, 'Sources'),
       h('ul', {},
         h('li', {}, link('https://open-meteo.com/en/docs/ensemble-api', 'Open-Meteo Ensemble API'), ' : ECMWF IFS ENS et AIFS ENS (', link('https://www.ecmwf.int/en/forecasts/datasets/open-data', 'données ouvertes ECMWF'), ', CC BY 4.0), ECMWF EC46, NOAA GEFS et AI-GEFS, ECCC GEPS, DWD ICON-EPS/EU-EPS/D2-EPS, UKMO MOGREPS-G, MeteoSwiss ICON-CH1/CH2-EPS, Google WeatherNext 2.'),
+        h('li', {}, link(PG.site, 'Paraglidable'), ' (API gratuite, ', link(PG.repo, 'code source GPL-3'), ') : réseau de neurones d’Antoine Meler entraîné sur les vols déclarés, nourri par GFS 0,25° ; interrogé une fois par heure.'),
         h('li', {}, link('https://open-meteo.com/en/docs', 'Open-Meteo Forecast API'), ' : AROME HD et AROME, ARPEGE (Météo-France), ICON-D2 et ICON-EU (DWD), ECMWF IFS HRES et AIFS, GFS, GEM, UKMO, JMA.'),
         h('li', {}, link('https://www.data.gouv.fr/fr/datasets/donnees-climatologiques-de-base-horaires/', 'Météo-France, données climatologiques de base horaires'), ' et ', link('https://www.data.gouv.fr/fr/datasets/donnees-climatologiques-de-base-quotidiennes/', 'quotidiennes'), ' (Licence Ouverte 2.0) : station 12145001 Millau et 12208004 Saint-Affrique ; ', link('https://donneespubliques.meteofrance.fr/FichesClim/FICHECLIM_12145001.pdf', 'fiche climatologique de Millau'), '.'),
         h('li', {}, link('https://open-meteo.com/en/docs/historical-weather-api', 'ERA5 (Copernicus / ECMWF)'), ' via Open-Meteo : calibration, pression de référence, Aigoual ; ', link('https://open-meteo.com/en/docs/historical-forecast-api', 'analyses GFS 2021-2025'), ' pour le géopotentiel et T 850 hPa.'),

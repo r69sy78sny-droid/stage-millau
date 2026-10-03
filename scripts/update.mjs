@@ -5,6 +5,8 @@
 // 3. recombine tout (data/systems/*.json + data/deterministic.json) en data/latest.json ;
 // 4. ajoute un point à data/history.json et commente l'issue d'alertes si l'aiguille a bougé de ±30.
 //
+// Paraglidable (secret PARAGLIDABLE_KEY) est interrogé une fois par heure ; son avis entre dans le mélange.
+//
 // Options : --force (tout retélécharger), --rebuild (recalculer sans télécharger), --dry (pas d'alerte).
 
 import fs from 'node:fs';
@@ -12,6 +14,7 @@ import { STAGE, POINTS, ENSEMBLES, DETERMINISTIC, DET_VARS, DET_VARS_VALLEY, ENG
 import { parseMembers, parseDeterministic, summarizeEnsemble, summarizeDeterministic } from '../engine/process.js';
 import { buildReport } from '../engine/report.js';
 import { getJson, getMeta, ensembleUrl, forecastRange, forecastUrl } from './openmeteo.mjs';
+import { fetchParaglidable, mergeParaglidable } from './paraglidable.mjs';
 
 const args = new Set(process.argv.slice(2));
 const FORCE = args.has('--force');
@@ -144,6 +147,26 @@ if (!REBUILD) {
   }
 }
 
+// ---------------------------------------------------------------- 3 bis. Paraglidable (avis IA, journée entière)
+// Une requête par heure au plus (premier passage de chaque heure), pour ménager le serveur bénévole.
+const PG_KEY = process.env.PARAGLIDABLE_KEY;
+if (!REBUILD && PG_KEY && (FORCE || RECOMBINE || new Date(now).getUTCMinutes() < 20)) {
+  try {
+    const fresh = await fetchParaglidable(PG_KEY);
+    const merged = mergeParaglidable(readJson('data/paraglidable.json'), fresh, STAGE.dates, now);
+    writeJson('data/paraglidable.json', merged.data);
+    const covered = STAGE.dates.filter((d) => fresh.days[d]);
+    if (merged.changed) {
+      refreshed.push('paraglidable');
+      triggers.push('Paraglidable');
+    }
+    log(`✓ Paraglidable : ${covered.length ? covered.map((d) => `${d.slice(8)} ${Math.round(fresh.days[d].fly * 100)} %`).join(', ') : 'ne couvre pas encore le stage'}${merged.changed ? ' (nouveau)' : ''}`);
+  } catch (e) {
+    errors.push(e.message);
+    log(`✗ ${e.message}`);
+  }
+}
+
 // ---------------------------------------------------------------- 4. combinaison
 if (!refreshed.length && !FORCE && !REBUILD && !RECOMBINE && fs.existsSync('data/latest.json')) {
   log('Aucun nouveau run utile : rien à publier.');
@@ -158,7 +181,7 @@ if (!ens.length) {
   process.exit(errors.length ? 1 : 0);
 }
 const observed = readJson('data/observed.json', {});
-const report = buildReport({ ens, det, clim, now, metas, refreshed, observed });
+const report = buildReport({ ens, det, clim, now, metas, refreshed, observed, paraglidable: readJson('data/paraglidable.json') });
 report.errors = errors;
 report.triggers = triggers;
 writeJson('data/latest.json', report);

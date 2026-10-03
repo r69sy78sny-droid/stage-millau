@@ -1,7 +1,7 @@
 // Combinaison des systèmes de prévision et de la climatologie : probabilité par matinée, puis
 // probabilité que les 3 séances volent (au moins 3 matinées volables sur 4), et position de l'aiguille.
 
-import { LEAD, STAGE, ENSEMBLES, DETERMINISTIC } from './config.js';
+import { LEAD, STAGE, ENSEMBLES, DETERMINISTIC, EXPERTS } from './config.js';
 import { REGIME_CODES } from './process.js';
 import { round } from './flyability.js';
 
@@ -50,7 +50,7 @@ export function poissonBinomial(ps) {
 
 const atLeast = (dist, k) => dist.slice(k).reduce((s, x) => s + x, 0);
 
-const CONFIG_BY_ID = Object.fromEntries([...ENSEMBLES, ...DETERMINISTIC].map((s) => [s.id, s]));
+const CONFIG_BY_ID = Object.fromEntries([...ENSEMBLES, ...DETERMINISTIC, ...EXPERTS].map((s) => [s.id, s]));
 
 /** Poids d'un système pour un jour donné (0 si le jour n'est pas couvert). */
 export function systemWeight(sys, d, all) {
@@ -191,7 +191,7 @@ export function blendRegimes(systems) {
     let tot = 0;
     systems.forEach((s) => {
       const w = systemWeight(s, d, systems);
-      if (!w) return;
+      if (!w || s.kind === 'ia') return; // les avis IA ne donnent pas de situation météo
       tot += w;
       const reg = s.kind === 'det' ? { [s.days[d].regime]: 1 } : s.days[d].reg ?? {};
       const rf = s.kind === 'det' ? { [s.days[d].regime]: s.days[d].P } : s.days[d].regFly ?? {};

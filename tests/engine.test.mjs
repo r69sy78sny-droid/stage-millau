@@ -7,6 +7,8 @@ import { leadWeight, poissonBinomial, combine, scoreFromP, clusters, systemWeigh
 import { parseMembers, evaluateDay, summarizeEnsemble, REGIME_CODES } from '../engine/process.js';
 import { buildReport, verdict } from '../engine/report.js';
 import { STAGE, ENSEMBLES } from '../engine/config.js';
+import { calibrateFly, parseApi, summarizeParaglidable, firstAvailable } from '../engine/paraglidable.js';
+import { mergeParaglidable } from '../scripts/paraglidable.mjs';
 
 const calm = { rr: 0, ws: 8, wg: 15, wd: 270, rh: 60, ccl: 10, wc: 1, cape: 0, ws850: 20 };
 const calib = { alpha: 0.7, beta: 2.3 };
@@ -194,4 +196,47 @@ test('le rapport complet se construit et reste borné', () => {
   assert.ok(r.analysis.summary.length >= 2);
   assert.ok(r.days[0].stats.tMax.length === 3);
   assert.equal(r.days[0].anom.normTx, 15.2); // normale de la station (16 °C à 712 m) ramenée à 828 m
+  assert.equal(r.paraglidable, null);
+
+  // Avec Paraglidable sur le premier jour : il entre dans le mélange sans diluer régimes ni critères limitants.
+  const pg = { fetchedAt: '2026-10-10T00:00:00Z', changedAt: '2026-10-10T00:00:00Z', spot: { name: 'Millau' }, days: { '2026-10-12': { fly: 0.95, XC: 0.1 } }, history: [{ t: '2026-10-10T00:00:00Z', v: { '2026-10-12': 0.95 } }] };
+  const r2 = buildReport({ ens: [fakeSystem('ecmwf_ens', good), fakeSystem('gefs', rainy)], det: [], clim: climFull, now: Date.parse('2026-10-10T00:00:00Z'), paraglidable: pg });
+  assert.ok(r2.days[0].contrib.some((c) => c.id === 'paraglidable'));
+  assert.ok(!r2.days[1].contrib.some((c) => c.id === 'paraglidable'));
+  assert.ok(r2.days[0].pModel > r.days[0].pModel);
+  assert.ok(Math.abs(r2.days[0].regimes.reduce((a, x) => a + x.p, 0) - 1) < 0.01);
+  assert.equal(r2.days[0].paraglidable.fly, 0.95);
+  assert.equal(r2.days[0].paraglidable.history.length, 1);
+  assert.equal(r2.days[1].paraglidable.fly, null);
+  assert.ok(r2.analysis.ia.length >= 1);
+  assert.ok(r2.systems.some((s) => s.id === 'paraglidable' && s.kind === 'ia'));
+});
+
+test('Paraglidable : lecture de l’API, rapprochement de la normale, historique', () => {
+  const api = { '2026-10-11': [{ lat: 44.1, lon: 3.07, name: 'Millau', forecast: { fly: 0.0667, XC: 0 } }], '2026-10-12': [{ lat: 44.1, lon: 3.07, name: 'Millau', forecast: { fly: 0.9059, XC: 0.1059 } }], junk: 3 };
+  const { spot, days } = parseApi(api);
+  assert.equal(spot.name, 'Millau');
+  assert.deepEqual(Object.keys(days), ['2026-10-11', '2026-10-12']);
+  // Monotone, rapproché de la normale, normale inchangée.
+  assert.ok(Math.abs(calibrateFly(0.6, 0.6) - 0.6) < 1e-9);
+  const hi = calibrateFly(0.95, 0.6);
+  const lo = calibrateFly(0.05, 0.6);
+  assert.ok(hi > 0.6 && hi < 0.95 && lo < 0.6 && lo > 0.05, `${hi} ${lo}`);
+  assert.ok(calibrateFly(0.9, 0.6) > calibrateFly(0.8, 0.6));
+  const sys = summarizeParaglidable({ days }, 0.6);
+  assert.deepEqual(sys.cover, [true, false, false, false]);
+  assert.equal(summarizeParaglidable({ days: { '2026-10-01': { fly: 0.5 } } }, 0.6), null);
+  assert.equal(firstAvailable('2026-10-15'), '2026-10-06');
+  // L'historique ne s'allonge que si un jour du stage change.
+  const m1 = mergeParaglidable(null, { spot, days }, STAGE.dates, Date.parse('2026-10-03T10:00:00Z'));
+  assert.ok(m1.changed);
+  assert.equal(m1.data.history.length, 1);
+  const days2 = { ...days, '2026-10-11': { fly: 0.5, XC: 0 } };
+  const m2 = mergeParaglidable(m1.data, { spot, days: days2 }, STAGE.dates, Date.parse('2026-10-03T11:00:00Z'));
+  assert.ok(!m2.changed);
+  assert.equal(m2.data.history.length, 1);
+  assert.equal(m2.data.changedAt, m1.data.changedAt);
+  const m3 = mergeParaglidable(m2.data, { spot, days: { ...days2, '2026-10-13': { fly: 0.4, XC: 0 } } }, STAGE.dates, Date.parse('2026-10-03T12:00:00Z'));
+  assert.ok(m3.changed);
+  assert.equal(m3.data.history.length, 2);
 });

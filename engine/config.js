@@ -165,6 +165,23 @@ export const DETERMINISTIC = [
   { id: 'jma', horizonHours: 264, model: 'jma_seamless', meta: 'jma_gsm', label: 'JMA GSM', provider: 'JMA (Japon)', res: '~20-55 km', horizon: '11 j', bias: 'coarse', weight: 0.2 },
 ];
 
+/**
+ * Avis « IA » qui ne donnent pas de météo mais directement une probabilité de vol par journée.
+ * Paraglidable (Antoine Meler, GPL-3) : réseau de neurones nourri par GFS 0,25°, entraîné sur les vols
+ * réellement déclarés par les pilotes. Sa cible n'est pas la nôtre (journée entière, pilotes de tous
+ * niveaux, maille de 25 km) et un seul run de GFS donne des avis trop tranchés à 7-9 jours : sa
+ * probabilité est rapprochée de la normale en logit (facteur `shrink`) avant d'entrer dans le mélange.
+ * La clé d'API est un secret GitHub (PARAGLIDABLE_KEY), jamais écrite dans le dépôt.
+ */
+export const EXPERTS = [
+  {
+    id: 'paraglidable', label: 'Paraglidable (IA de volabilité)', short: 'Paraglidable',
+    provider: 'Antoine Meler · réseau de neurones entraîné sur les vols déclarés', res: 'GFS 0,25°, journée entière', horizon: '10 j',
+    weight: 1.5, shrink: 0.6, horizonDays: 9, minFetchMinutes: 55,
+    url: 'https://api.paraglidable.com/', site: 'https://paraglidable.com/', repo: 'https://github.com/AntoineMeler/Paraglidable',
+  },
+];
+
 export const DET_VARS = [
   'temperature_2m', 'relative_humidity_2m', 'dew_point_2m', 'precipitation', 'showers', 'cloud_cover', 'cloud_cover_low',
   'cloud_cover_mid', 'cloud_cover_high', 'weather_code', 'visibility', 'wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m',

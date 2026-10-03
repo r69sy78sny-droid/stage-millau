@@ -55,6 +55,7 @@ jobs:
         id: run
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PARAGLIDABLE_KEY: ${{ secrets.PARAGLIDABLE_KEY }}
           FORCE: ${{ inputs.force }}
           EVENT: ${{ github.event_name }}
         run: |
