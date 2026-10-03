@@ -139,10 +139,18 @@ const lastSeenDelta = (lastSeen, score) => (store.get('lastScore') == null || Nu
 // Dernière vérification du robot (même sans nouveauté) : lue dans l'API publique de GitHub Actions.
 let lastCheck = null;
 async function fetchLastCheck() {
+  // Heure de fin du dernier job « update » réussi (le passage reste « en cours » pendant l'attente de la relance).
+  const base = 'https://api.github.com/repos/r69sy78sny-droid/stage-millau/actions';
+  const get = async (url) => (await fetch(url, { cache: 'no-store' })).json();
   try {
-    const r = await fetch('https://api.github.com/repos/r69sy78sny-droid/stage-millau/actions/workflows/aiguille.yml/runs?per_page=1&status=success', { cache: 'no-store' });
-    const run = (await r.json()).workflow_runs?.[0];
-    if (run) lastCheck = run.updated_at;
+    const runs = (await get(`${base}/workflows/aiguille.yml/runs?per_page=4`)).workflow_runs ?? [];
+    for (const run of runs.slice(0, 3)) {
+      const job = ((await get(`${base}/runs/${run.id}/jobs`)).jobs ?? []).find((j) => j.name === 'update' && j.conclusion === 'success');
+      if (job) {
+        lastCheck = job.completed_at;
+        break;
+      }
+    }
   } catch {
     /* API indisponible ou quota atteint : on garde la dernière valeur */
   }
