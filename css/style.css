@@ -161,6 +161,8 @@ small, .small { font-size: 0.85rem; }
 .readout .verdict { font-size: 1.35rem; font-weight: 650; margin-top: 6px; }
 .readout .proba { font-size: 1.05rem; color: var(--ink-2); margin-top: 8px; }
 .readout .proba b { color: var(--ink); }
+.readout .proba2 { font-size: 1.05rem; color: var(--ink-2); margin-top: 4px; }
+.readout .proba2 b { color: var(--ink); }
 .readout .clim { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
 .readout .summary { margin-top: 14px; color: var(--ink-2); }
 .badge {
@@ -301,4 +303,34 @@ footer a { color: var(--ink-2); }
 }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
+}
+
+/* Fin de stage */
+.finale { margin: 14px 0 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.finale[hidden] { display: none; }
+.finale-sky { line-height: 0; background: #f7d9a8; }
+.finale-scene { display: block; width: 100%; height: auto; max-height: 240px; }
+.finale-body { padding: 16px 18px 18px; }
+.finale-body h2 { margin: 0 0 4px; font-size: 1.4rem; }
+.finale-body p { margin: 0 0 12px; color: var(--ink-2); max-width: 62ch; }
+.finale-days { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+.fday { border-radius: 10px; padding: 8px 10px; background: var(--surface-2); border: 1px solid var(--border); font-size: 0.85rem; display: flex; flex-direction: column; gap: 2px; }
+.fday.ok { background: rgba(12, 163, 12, 0.12); border-color: var(--good); }
+.fday.ko { background: rgba(208, 59, 59, 0.1); border-color: var(--critical); }
+.fday span { color: var(--ink-2); }
+.finale-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { display: inline-block; border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 999px; padding: 7px 16px; font: inherit; font-size: 0.9rem; text-decoration: none; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.fin-fly { animation: fin-fly var(--dur) linear var(--delay) infinite; }
+.fin-bob { animation: fin-bob var(--bob) ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 100%; }
+.fin-sun { animation: fin-sun 5s ease-in-out infinite alternate; }
+.fin-clouds { animation: fin-clouds 60s linear infinite; }
+@keyframes fin-fly { from { transform: translateX(-120px); } to { transform: translateX(920px); } }
+@keyframes fin-bob { from { transform: translateY(-5px) rotate(-3deg); } to { transform: translateY(6px) rotate(3deg); } }
+@keyframes fin-sun { from { opacity: 0.85; } to { opacity: 1; } }
+@keyframes fin-clouds { from { transform: translateX(-40px); } to { transform: translateX(60px); } }
+@media (max-width: 640px) { .finale-days { grid-template-columns: repeat(2, 1fr); } }
+@media (prefers-reduced-motion: reduce) {
+  .fin-fly, .fin-bob, .fin-sun, .fin-clouds { animation: none; }
+  .fin-fly { transform: translateX(300px); }
 }

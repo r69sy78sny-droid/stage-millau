@@ -2,6 +2,8 @@
 // puis revérifie toutes les 5 minutes pour faire bouger l'aiguille dès qu'une mise à jour est publiée.
 
 import { createGauge } from './gauge.js';
+import { renderFinale, confetti } from './finale.js';
+import { stageOver, stageOutcome } from '../engine/finale.js';
 import { h, heat, fmtPct, fmtScore, historyChart, distChart, regimeBars, windRose, reliabilityChart } from './charts.js';
 import { REGIMES, LIMITS, SITES, ENSEMBLES, DETERMINISTIC, EXPERTS, LEAD } from '../engine/config.js';
 
@@ -90,8 +92,44 @@ async function refresh(initial = false) {
   renderAll({ previous, initial });
 }
 
+// ---------------------------------------------------------------- fin de stage
+// ?finale=succes | rate | attente force la carte de fin (aperçu) ; sans paramètre, elle apparaît toute seule
+// à 13 h le jeudi 15, quand la dernière matinée est passée.
+const FORCED = new URLSearchParams(location.search).get('finale');
+const FORCED_OBSERVED = { succes: [true, true, false, true], rate: [false, true, false, false], attente: [null, null, null, null] };
+const isOver = () => FORCED in FORCED_OBSERVED || (report ? stageOver(Date.now(), report.stage.dates) : false);
+const ISSUES_URL = 'https://github.com/r69sy78sny-droid/stage-millau/issues/1';
+let finalePlayed = false;
+
+function showFinale({ celebrate }) {
+  const box = $('finale');
+  const observed = FORCED in FORCED_OBSERVED ? FORCED_OBSERVED[FORCED] : report.days.map((d) => d.observed);
+  const outcome = stageOutcome(observed, report.stage.sessionsNeeded);
+  renderFinale(box, {
+    days: report.days.map((d, i) => ({ label: shortDay(d.label), observed: observed[i], p: d.p })),
+    outcome,
+    issueUrl: ISSUES_URL,
+    onReplay: () => {
+      showFinale({ celebrate: true });
+      box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+  });
+  if (celebrate && outcome.kind === 'reussi') confetti();
+}
+
+function renderFinaleCard() {
+  if (!isOver()) {
+    $('finale').hidden = true;
+    return;
+  }
+  // Les confettis ne partent qu'une fois par visite ; les mises à jour suivantes ne font que rafraîchir la carte.
+  showFinale({ celebrate: !finalePlayed });
+  finalePlayed = true;
+}
+
 function renderAll({ previous, initial }) {
   renderHero(previous, initial);
+  renderFinaleCard();
   renderDays();
   renderDist();
   renderHistory();
@@ -114,17 +152,19 @@ function renderHero(previous, initial) {
   gauge.setLabel(`Aiguille à ${fmtScore(r.score)} sur une échelle de −180 (impossible) à +180 (le stage aura lieu) : ${r.verdict.label}.`);
   $('score').textContent = fmtScore(r.score);
   $('verdict').textContent = r.verdict.label;
+  const need = r.stage.sessionsNeeded;
   $('proba').replaceChildren(
-    'Probabilité que tes ', h('b', {}, `${r.stage.sessionsNeeded} matinées`), ' volent : ', h('b', {}, fmtPct(r.p)),
+    'Probabilité que tes ', h('b', {}, `${need} matinées`), ' volent : ', h('b', {}, fmtPct(r.p)),
     ` · ${fr(r.expected, 1)} matinée(s) volable(s) attendue(s) sur 4`,
   );
-  const need = r.stage.sessionsNeeded;
-  $('clim').textContent = `Normale à Millau (${r.climatology.period}) : ${fmtPct(r.climatology.pAtLeast[need - 1])}, soit ${fmtScore(r.climatology.scoreClim)} sur l'aiguille.`;
+  $('proba2').replaceChildren('Probabilité que les ', h('b', {}, '4 matinées'), ' volent : ', h('b', {}, fmtPct(r.pAll)), ` (normale ${fmtPct(r.climatology.pAll)})`);
+  $('clim').textContent = `Normale à Millau (${r.climatology.period}) : ${fmtPct(r.climatology.pAtLeast[need - 1])} pour ${need} matinées, soit ${fmtScore(r.climatology.scoreClim)} sur l'aiguille.`;
   $('summary').textContent = r.analysis.summary.slice(1).join(' ');
   const ageH = (Date.now() - Date.parse(r.generatedAt)) / 3600e3;
+  const over = isOver();
   const delta = previous ? r.score - previous.score : lastSeenDelta(lastSeen, r.score);
   $('updated').replaceChildren(...[
-    h('span', { class: `badge ${ageH < 12 ? 'live' : ''}` }, h('i', { class: 'dot' }), ageH < 12 ? 'Suivi en direct' : 'Suivi en pause'),
+    h('span', { class: `badge ${!over && ageH < 12 ? 'live' : ''}` }, h('i', { class: 'dot' }), over ? 'Stage terminé' : ageH < 12 ? 'Suivi en direct' : 'Suivi en pause'),
     h('span', {}, `Données modifiées ${fmtWhen(r.generatedAt)}`),
     r.triggers?.length ? h('span', {}, `après ${r.triggers.join(', ')}`) : null,
     delta ? h('span', {}, `${fmtScore(delta)} depuis ta dernière visite`) : null,
@@ -234,7 +274,7 @@ function selectDay(i) {
 function renderDist() {
   const r = report;
   const need = r.stage.sessionsNeeded;
-  $('dist-cap').replaceChildren(h('b', {}, 'Combien de matinées volables ?'), ` Il en faut ${need} sur 4 : ${fmtPct(r.p)} (normale ${fmtPct(r.climatology.pAtLeast[need - 1])}).`);
+  $('dist-cap').replaceChildren(h('b', {}, 'Combien de matinées volables ?'), ` Il en faut ${need} sur 4 : ${fmtPct(r.p)} (normale ${fmtPct(r.climatology.pAtLeast[need - 1])}). Les 4 : ${fmtPct(r.pAll)} (normale ${fmtPct(r.climatology.pAll)}).`);
   distChart($('dist'), r.dist, r.climatology.dist4, need);
   $('dist-table').replaceChildren(table(['Matinées volables', 'Prévision', 'Climatologie'], r.dist.map((p, k) => [k, fmtPct(p), fmtPct(r.climatology.dist4[k])]), [false, true, true]));
 }

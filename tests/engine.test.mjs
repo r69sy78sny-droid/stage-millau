@@ -7,6 +7,7 @@ import { leadWeight, poissonBinomial, combine, scoreFromP, clusters, systemWeigh
 import { parseMembers, evaluateDay, summarizeEnsemble, REGIME_CODES } from '../engine/process.js';
 import { buildReport, verdict } from '../engine/report.js';
 import { STAGE, ENSEMBLES } from '../engine/config.js';
+import { stageOutcome, stageOver } from '../engine/finale.js';
 import { calibrateFly, parseApi, summarizeParaglidable, firstAvailable } from '../engine/paraglidable.js';
 import { mergeParaglidable } from '../scripts/paraglidable.mjs';
 
@@ -197,6 +198,10 @@ test('le rapport complet se construit et reste borné', () => {
   assert.ok(r.days[0].stats.tMax.length === 3);
   assert.equal(r.days[0].anom.normTx, 15.2); // normale de la station (16 °C à 712 m) ramenée à 828 m
   assert.equal(r.paraglidable, null);
+  assert.equal(r.pAll, r.dist[4]);
+  assert.ok(r.pAll <= r.p);
+  assert.equal(r.climatology.pAll, 0.2);
+  assert.ok(/Les 4 matinées volent dans/.test(r.analysis.summary[0]));
 
   // Avec Paraglidable sur le premier jour : il entre dans le mélange sans diluer régimes ni critères limitants.
   const pg = { fetchedAt: '2026-10-10T00:00:00Z', changedAt: '2026-10-10T00:00:00Z', spot: { name: 'Millau' }, days: { '2026-10-12': { fly: 0.95, XC: 0.1 } }, history: [{ t: '2026-10-10T00:00:00Z', v: { '2026-10-12': 0.95 } }] };
@@ -239,4 +244,16 @@ test('Paraglidable : lecture de l’API, rapprochement de la normale, historique
   const m3 = mergeParaglidable(m2.data, { spot, days: { ...days2, '2026-10-13': { fly: 0.4, XC: 0 } } }, STAGE.dates, Date.parse('2026-10-03T12:00:00Z'));
   assert.ok(m3.changed);
   assert.equal(m3.data.history.length, 2);
+});
+
+test('bilan du stage : réussi, raté ou à confirmer', () => {
+  assert.equal(stageOutcome([true, true, false, true]).kind, 'reussi');
+  assert.equal(stageOutcome([true, true, true, null]).kind, 'reussi');
+  assert.equal(stageOutcome([false, true, false, true]).kind, 'rate');
+  assert.equal(stageOutcome([false, false, null, null]).kind, 'rate');
+  assert.equal(stageOutcome([true, null, null, null]).kind, 'attente');
+  assert.equal(stageOutcome([null, null, null, null]).kind, 'attente');
+  assert.deepEqual(stageOutcome([true, false, null, true]), { kind: 'attente', flown: 2, missed: 1, unknown: 1, need: 3 });
+  assert.ok(!stageOver(Date.parse('2026-10-15T10:59:00Z')));
+  assert.ok(stageOver(Date.parse('2026-10-15T11:01:00Z')));
 });

@@ -186,6 +186,7 @@ export function buildReport({ ens, det, clim, now = Date.now(), metas = {}, refr
     stage: { ...STAGE, sites: SITES, limits: LIMITS, points: POINTS, alertThreshold: ALERT.threshold },
     score: comb.score,
     p: comb.p,
+    pAll: comb.dist.at(-1), // les 4 matinées volables
     verdict: verdict(comb.score),
     dist: comb.dist,
     expected: comb.expected,
@@ -200,6 +201,7 @@ export function buildReport({ ens, det, clim, now = Date.now(), metas = {}, refr
     climatology: {
       pMorning: clim.mornings.pMorning,
       pAtLeast: clim.mornings.pAtLeast,
+      pAll: clim.mornings.dist4.at(-1),
       dist4: clim.mornings.dist4,
       period: clim.mornings.period,
       window: clim.mornings.window,
@@ -241,7 +243,7 @@ export function writeAnalysis(r) {
   const need = r.stage.sessionsNeeded;
   out.summary.push(
     `Probabilité que tes ${need} matinées de vol tiennent entre le 12 et le 15 octobre : ${pct(r.p)} ` +
-    `(aiguille ${signed(r.score)}). En moyenne ${fr(r.expected, 1)} matinée(s) volable(s) sur 4 attendue(s). ` +
+    `(aiguille ${signed(r.score)}). Les 4 matinées volent dans ${pct(r.pAll)} des cas (normale ${pct(c.pAll)}) ; en moyenne ${fr(r.expected, 1)} matinée(s) volable(s) sur 4 attendue(s). ` +
     `Référence climatologique à Millau (${c.period}, ${c.window}) : ${pct(c.pAtLeast[need - 1])}, soit ${signed(c.scoreClim)} sur l'aiguille.`,
   );
   if (aMean < 0.25) {

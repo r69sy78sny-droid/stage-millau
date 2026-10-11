@@ -193,6 +193,7 @@ const entry = {
   t: report.generatedAt,
   score: report.score,
   p: report.p,
+  pAll: report.pAll,
   pDays: report.days.map((d) => d.p),
   a: report.days.map((d) => d.a),
   expected: report.expected,
@@ -241,7 +242,7 @@ async function postAlert(prevScore) {
   const body = [
     `@${owner} l'aiguille est passée de **${fmtScore(prevScore)}** à **${fmtScore(report.score)}** (${fmtScore(delta)} points).`,
     '',
-    `**Probabilité que tes ${STAGE.sessionsNeeded} matinées volent : ${Math.round(report.p * 100)} %** — ${report.verdict.label}.`,
+    `**Probabilité que tes ${STAGE.sessionsNeeded} matinées volent : ${Math.round(report.p * 100)} %** — ${report.verdict.label}. Les 4 matinées : ${Math.round(report.pAll * 100)} %.`,
     '',
     '| Matinée | Volable |',
     '|---|---|',
